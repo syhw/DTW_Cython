@@ -33,11 +33,11 @@ def DTW(x, y, dist_function=None, dist_array=None):
         d_f = lambda i,j: euclidian_distance(x[i], y[j])
     else:
         if dist_function != None:
-            d_f = lambda i,j: dist_function(x[i], y[i])
+            d_f = lambda i,j: dist_function(x[i], y[j])
         elif dist_array != None:
             d_f = lambda i,j: dist_array[i][j]
-    if d_a == None:
-        d_a = fill_dist_array(x, y, d_f)
+    #if d_a == None:
+    #    d_a = fill_dist_array(x, y, d_f)
 
     cost = np.empty((x.shape[0], y.shape[0]), dtype=np.float)
     cost[0,0] = d_f(0,0)
@@ -61,7 +61,7 @@ def DTW(x, y, dist_function=None, dist_array=None):
 
 def test():
     np.random.seed(42)
-    a = np.random.random((110, 10))
+    a = np.random.random((170, 10))
     b = np.random.random((130, 10))
     t = time.time()
     for k in xrange(10):
