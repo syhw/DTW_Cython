@@ -8,13 +8,15 @@ cimport numpy as np
 import numpy as np
 cimport cython
 from libc.math cimport sqrt
+#from cython.view cimport array as cvarray
 import time
 
 DTYPE = np.float64
 ctypedef np.float64_t DTYPE_t
 
 
-def e_dist(np.ndarray[DTYPE_t, ndim=1] x, np.ndarray[DTYPE_t, ndim=1] y):
+#def e_dist(np.ndarray[DTYPE_t, ndim=1] x, np.ndarray[DTYPE_t, ndim=1] y):
+def e_dist(DTYPE_t[:] x, DTYPE_t[:] y):
     """ Equivalent to: d=x-y, return sqrt(dot(d,d)) """
     # In [11]: %timeit dist(a,b) # numpy version as above
     # 100000 loops, best of 3: 6.49 µs per loop
@@ -29,13 +31,15 @@ def e_dist(np.ndarray[DTYPE_t, ndim=1] x, np.ndarray[DTYPE_t, ndim=1] y):
     return sqrt(d)
 
 
-def euclidian_distance(np.ndarray[DTYPE_t, ndim=2] x, np.ndarray[DTYPE_t, ndim=2] y):
+#def euclidian_distance(np.ndarray[DTYPE_t, ndim=2] x, np.ndarray[DTYPE_t, ndim=2] y):
+def euclidian_distance(DTYPE_t[:,:] x, DTYPE_t[:,:] y):
     cdef DTYPE_t d, tmp
     cdef int N = x.shape[0]
     cdef int M = y.shape[0]
     cdef int K = y.shape[1]
     #cdef double[:, ::1] D = np.empty((N,M), dtype=np.float64)
-    cdef np.ndarray[np.float_t, ndim=2] D = np.empty((N,M), dtype=np.float64)
+    cdef double[:,:] D = np.empty((N,M), dtype=np.float64)
+    #cdef np.ndarray[np.float_t, ndim=2] D = np.empty((N,M), dtype=np.float64)
     for i in range(N):
         for j in range(M):
             d = 0.0
@@ -46,13 +50,15 @@ def euclidian_distance(np.ndarray[DTYPE_t, ndim=2] x, np.ndarray[DTYPE_t, ndim=2
     return np.asarray(D)
 
 
-def manhattan_distance(np.ndarray[DTYPE_t, ndim=2] x, np.ndarray[DTYPE_t, ndim=2] y):
+#def manhattan_distance(np.ndarray[DTYPE_t, ndim=2] x, np.ndarray[DTYPE_t, ndim=2] y):
+def manhattan_distance(DTYPE_t[:,:] x, DTYPE_t[:,:] y):
     cdef DTYPE_t d, tmp
     cdef int N = x.shape[0]
     cdef int M = y.shape[0]
     cdef int K = y.shape[1]
     #cdef double[:, ::1] D = np.empty((N,M), dtype=np.float64)
-    cdef np.ndarray[np.float_t, ndim=2] D = np.empty((N,M), dtype=np.float64)
+    cdef double[:,:] D = np.empty((N,M), dtype=np.float64)
+    #cdef np.ndarray[np.float_t, ndim=2] D = np.empty((N,M), dtype=np.float64)
     for i in range(N):
         for j in range(M):
             d = 0.0
@@ -76,7 +82,8 @@ def DTW(x, y, dist_function=None, dist_array=None):
     return DTW_cython(xx, yy, dist_function=dist_function, dist_array=dist_array)
 
 
-def DTW_cython(np.ndarray[DTYPE_t, ndim=2] x, np.ndarray[DTYPE_t, ndim=2] y, dist_function=None, dist_array=None):
+#def DTW_cython(np.ndarray[DTYPE_t, ndim=2] x, np.ndarray[DTYPE_t, ndim=2] y, dist_function=None, dist_array=None):
+def DTW_cython(DTYPE_t[:,:] x, DTYPE_t[:,:] y, dist_function=None, dist_array=None):
     """
     Default is euclidian distance, otherwise provide (in order of priority):
      - a distance function as dist_function
@@ -84,8 +91,10 @@ def DTW_cython(np.ndarray[DTYPE_t, ndim=2] x, np.ndarray[DTYPE_t, ndim=2] y, dis
     """
     cdef int N = x.shape[0]
     cdef int M = y.shape[0]
+    cdef int i, j
     #cdef double[:, ::1] cost = np.empty((N, M), dtype=np.float64)
-    cdef np.ndarray[np.float_t, ndim=2] cost = np.empty((N,M), dtype=np.float64)
+    cdef double[:, :] cost = np.empty((N, M), dtype=np.float64)
+    #cdef np.ndarray[np.float_t, ndim=2] cost = np.empty((N,M), dtype=np.float64)
 
     if dist_array != None:
         cost[:,0] = dist_array[:,0]
