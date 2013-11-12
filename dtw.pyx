@@ -1,8 +1,13 @@
-#cython: profile=True
-#TODO set to False
+#cython: profile=False
+# set profile to True to see where we are spending time / what is Cythonized
 #cython: boundscheck=False
+# set boundscheck to True when debugging out of bounds errors
 #cython: wraparound=False
 
+# TODO maybe use DTYPE_t[:,::1] (C contiguous) memoryview instd of DTYPE_t[:,:]
+# tried it -> no speed improvement
+# TODO understand why cpdef is faster than cdef
+# TODO see if we can add some "nogil" (cpdef foo(int a, int b) nogil:...)
 
 import numpy as np
 cimport numpy as np
@@ -14,7 +19,7 @@ DTYPE = np.float64
 ctypedef np.float64_t DTYPE_t
 
 
-def e_dist(DTYPE_t[:] x, DTYPE_t[:] y):
+cpdef e_dist(DTYPE_t[:] x, DTYPE_t[:] y):
     """ Euclidian distance, equivalent to: d=x-y, return sqrt(dot(d,d)) """
     # In [11]: %timeit dist(a,b) # numpy version as above
     # 100000 loops, best of 3: 6.49 µs per loop
@@ -29,7 +34,7 @@ def e_dist(DTYPE_t[:] x, DTYPE_t[:] y):
     return sqrt(d)
 
 
-def m_dist(DTYPE_t[:] x, DTYPE_t[:] y):
+cpdef m_dist(DTYPE_t[:] x, DTYPE_t[:] y):
     """ Manhattan distance, equivalent to: d=x-y, return sum(abs(d)) """
     # In [11]: %timeit dist(a,b) # numpy version as above
     # 100000 loops, best of 3: 11.1 µs per loop
@@ -44,29 +49,44 @@ def m_dist(DTYPE_t[:] x, DTYPE_t[:] y):
 
 
 def DTW(x, y, dist_function=None, dist_array=None):
-    """ Python wrapper does the array format checks + asserts """
+    """ Python wrapper does the array format checks + asserts + distance string
+     - x and y should be numpy 2dim ndarrays of DTYPE.
+     - dist_function should be a Cython/Python function,
+       or "euclidian"/"manhattan" strings.
+     - dist_array should be a x.shape[0], y.shape[0] 2dim ndarray of DTYPE.
+    --> a little bit of overhead, maybe you want to call DTW_cython directly"""
     xx = x
     if len(x.shape) == 1:
         xx = np.reshape(x, (x.shape[0], 1))
+    if xx.dtype != DTYPE:
+        xx = np.asarray(xx, dtype=DTYPE)
     yy = y
     if len(y.shape) == 1:
         yy = np.reshape(y, (y.shape[0], 1))
+    if yy.dtype != DTYPE:
+        yy = np.asarray(yy, dtype=DTYPE)
     assert(xx.shape[1] == yy.shape[1])
     if dist_array != None:
         assert(dist_array.shape == (x.shape[0], y.shape[0]))
+        if dist_array.dtype != DTYPE:
+            dist_array = np.asarray(dist_array, dtype=DTYPE)
+    if dist_function == "euclidian":
+        dist_function = e_dist
+    elif dist_function == "manhattan":
+        dist_function = m_dist
     return DTW_cython(xx, yy, dist_function=dist_function, dist_array=dist_array)
 
 
-def DTW_cython(DTYPE_t[:,:] x, DTYPE_t[:,:] y, dist_function=None, dist_array=None):
+cpdef DTW_cython(DTYPE_t[:,:] x, DTYPE_t[:,:] y, dist_function=None, dist_array=None):
     """
     Default is euclidian distance, otherwise provide (in order of priority):
-     - a distance function as dist_function
      - a distance array as dist_array[x_ind][y_ind]
+     - a distance function as dist_function
     """
     cdef int N = x.shape[0]
     cdef int M = y.shape[0]
     cdef int i, j
-    cdef double[:, :] cost = np.empty((N, M), dtype=np.float64)
+    cdef double[:,:] cost = np.empty((N, M), dtype=DTYPE)
 
     if dist_array != None:
         cost[:,0] = dist_array[:,0]
@@ -91,9 +111,10 @@ def DTW_cython(DTYPE_t[:,:] x, DTYPE_t[:,:] y, dist_function=None, dist_array=No
                                                             cost[i-1,j-1],
                                                             cost[i,j-1])
     # here, cost[x.shape[0]-1,y.shape[0]-1] is the best possible distance
-    path_x = None
-    path_y = None
-    return cost[N-1,M-1], cost, (path_x, path_y)
+    # now, compute the path from x to y: path_x[x_ind] = y_ind; & y to x path_y
+    path = None
+
+    return cost[N-1,M-1], cost, path
 
 
 def test():
@@ -111,7 +132,7 @@ def test():
     a = np.random.random(900)
     b = np.random.random(1000)
     t = time.time()
-    for k in xrange(10):
+    for k in xrange(5):
         d = DTW(a, b, e_dist)
     print d
     print "took:", ((time.time() - t) / k),  "seconds per run"
@@ -126,6 +147,23 @@ def test():
     print d
     print "took:", ((time.time() - t) / k),  "seconds"
     np.testing.assert_almost_equal(d[0], 147.10538852640641)
+
+    # R dtw align of f101_at/af : time: 0.101805925369, cost: 1586.29814585
+    import htkmfc
+    mfc1 = np.asarray(htkmfc.open("s_f101_at.mfc").getall(), dtype=DTYPE)
+    mfc2 = np.asarray(htkmfc.open("s_f101_ar.mfc").getall(), dtype=DTYPE)
+    t = time.time()
+    d = DTW(mfc1, mfc2, e_dist)
+    print d
+    print "took:", ((time.time() - t) / k),  "seconds"
+
+    # R dtw align of f113_xof_xok : time: 0.0426249504089, cost: 1730.2299737
+    mfc1 = np.asarray(htkmfc.open("s_f113_xof.mfc").getall(), dtype=DTYPE)
+    mfc2 = np.asarray(htkmfc.open("s_f113_xok.mfc").getall(), dtype=DTYPE)
+    t = time.time()
+    d = DTW(mfc1, mfc2, e_dist)
+    print d
+    print "took:", ((time.time() - t) / k),  "seconds"
 
 
 if __name__ == '__main__':
