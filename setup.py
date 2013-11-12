@@ -13,5 +13,6 @@ setup(
         cmdclass = {'build_ext': build_ext},
         ext_modules = [Extension("dtw", 
                                  ["dtw.pyx"],
-                                 include_dirs=py_inc+np_inc)]
+                                 include_dirs=py_inc+np_inc,
+                                 extra_compile_args=["-O3"])]
 )

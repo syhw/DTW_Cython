@@ -4,8 +4,8 @@
 #cython: wraparound=False
 
 
-cimport numpy as np
 import numpy as np
+cimport numpy as np
 cimport cython
 from libc.math cimport sqrt
 import time
@@ -15,7 +15,7 @@ ctypedef np.float64_t DTYPE_t
 
 
 def e_dist(DTYPE_t[:] x, DTYPE_t[:] y):
-    """ Equivalent to: d=x-y, return sqrt(dot(d,d)) """
+    """ Euclidian distance, equivalent to: d=x-y, return sqrt(dot(d,d)) """
     # In [11]: %timeit dist(a,b) # numpy version as above
     # 100000 loops, best of 3: 6.49 µs per loop
     # In [12]: %timeit e_dist(a,b)
@@ -29,35 +29,18 @@ def e_dist(DTYPE_t[:] x, DTYPE_t[:] y):
     return sqrt(d)
 
 
-def euclidian_distance(DTYPE_t[:,:] x, DTYPE_t[:,:] y):
-    cdef DTYPE_t d, tmp
-    cdef int N = x.shape[0]
-    cdef int M = y.shape[0]
-    cdef int K = y.shape[1]
-    cdef double[:,:] D = np.empty((N,M), dtype=np.float64)
-    for i in range(N):
-        for j in range(M):
-            d = 0.0
-            for k in range(K):
-                tmp = x[i,k] - y[j,k]
-                d += tmp * tmp
-            D[i,j] = sqrt(d)
-    return np.asarray(D)
-
-
-def manhattan_distance(DTYPE_t[:,:] x, DTYPE_t[:,:] y):
-    cdef DTYPE_t d, tmp
-    cdef int N = x.shape[0]
-    cdef int M = y.shape[0]
-    cdef int K = y.shape[1]
-    cdef double[:,:] D = np.empty((N,M), dtype=np.float64)
-    for i in range(N):
-        for j in range(M):
-            d = 0.0
-            for k in range(K):
-                d += abs(x[i,k] - y[j,k])
-            D[i,j] = d
-    return np.asarray(D)
+def m_dist(DTYPE_t[:] x, DTYPE_t[:] y):
+    """ Manhattan distance, equivalent to: d=x-y, return sum(abs(d)) """
+    # In [11]: %timeit dist(a,b) # numpy version as above
+    # 100000 loops, best of 3: 11.1 µs per loop
+    # In [12]: %timeit m_dist(a,b)
+    # 1000000 loops, best of 3: 1.9 µs per loop
+    cdef DTYPE_t d
+    cdef int K = x.shape[0]
+    d = 0.0
+    for k in range(K):
+        d += abs(x[k] - y[k])
+    return d
 
 
 def DTW(x, y, dist_function=None, dist_array=None):
@@ -122,26 +105,27 @@ def test():
         d = DTW(a, b, e_dist)
     print d
     print "took:", ((time.time() - t) / k),  "seconds per run"
-
-
-    import sys
-    sys.exit(0)
-
+    np.testing.assert_almost_equal(d[0], 139.79425569811386)
 
     np.random.seed(42)
     a = np.random.random(900)
     b = np.random.random(1000)
     t = time.time()
     for k in xrange(10):
-        DTW(a, b, euclidian_distance)
+        d = DTW(a, b, e_dist)
+    print d
     print "took:", ((time.time() - t) / k),  "seconds per run"
+    np.testing.assert_almost_equal(d[0], 126.59496270135652)
+
     np.random.seed(42)
     idx = np.linspace(0, 2*np.pi, 1000)
     template = np.cos(idx)
     query = np.r_[np.sin(idx) + np.random.random(1000)/2., np.array([0 for i in range(20)])]
     t = time.time()
-    print DTW(query, template, euclidian_distance)
+    d = DTW(query, template, e_dist)
+    print d
     print "took:", ((time.time() - t) / k),  "seconds"
+    np.testing.assert_almost_equal(d[0], 147.10538852640641)
 
 
 if __name__ == '__main__':
