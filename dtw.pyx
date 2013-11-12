@@ -212,6 +212,11 @@ def test():
     d = DTW(mfc1, mfc2, e_dist)
     print "took:", (time.time() - t),  "seconds"
     print "cost:", d[0]
+    import pylab as pl
+    pl.imshow(d[2][0].T, interpolation="nearest", origin="lower")
+    pl.savefig("path.png")
+    pl.imshow(np.asarray(d[1]).T, interpolation="nearest", origin="lower")
+    pl.savefig("cost.png")
 
     # R dtw align of f113_xof_xok : time: 0.0426249504089, cost: 1730.2299737
     mfc1 = np.asarray(htkmfc.open("s_f113_xof.mfc").getall(), dtype=DTYPE)
@@ -220,11 +225,10 @@ def test():
     d = DTW(mfc1, mfc2, e_dist)
     print "took:", (time.time() - t),  "seconds"
     print "cost:", d[0]
-    import pylab as pl
     pl.imshow(d[2][0].T, interpolation="nearest", origin="lower")
-    pl.savefig("path.png")
+    pl.savefig("path2.png")
     pl.imshow(np.asarray(d[1]).T, interpolation="nearest", origin="lower")
-    pl.savefig("cost.png")
+    pl.savefig("cost2.png")
 
 
 if __name__ == '__main__':
