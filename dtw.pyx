@@ -167,35 +167,42 @@ cpdef DTW_cython(DTYPE_t[:,:] x, DTYPE_t[:,:] y, dist_function=None, dist_array=
 
 
 def test():
-#    np.random.seed(42)
-#    a = np.random.random((170, 10))
-#    b = np.random.random((130, 10))
-#    t = time.time()
-#    for k in xrange(10):
-#        d = DTW(a, b, e_dist)
-#    print "took:", ((time.time() - t) / k),  "seconds per run"
-#    print "cost:", d[0]
-#    np.testing.assert_almost_equal(d[0], 139.79425569811386)
-#
-#    np.random.seed(42)
-#    a = np.random.random(900)
-#    b = np.random.random(1000)
-#    t = time.time()
-#    for k in xrange(3):
-#        d = DTW(a, b, e_dist)
-#    print "took:", ((time.time() - t) / k),  "seconds per run"
-#    print "cost:", d[0]
-#    np.testing.assert_almost_equal(d[0], 126.59496270135652)
-#
-#    np.random.seed(42)
-#    idx = np.linspace(0, 2*np.pi, 1000)
-#    template = np.cos(idx)
-#    query = np.r_[np.sin(idx) + np.random.random(1000)/2., np.array([0 for i in range(20)])]
-#    t = time.time()
-#    d = DTW(query, template, e_dist)
-#    print "took:", (time.time() - t),  "seconds"
-#    print "cost:", d[0]
-#    np.testing.assert_almost_equal(d[0], 147.10538852640641)
+    a = np.array([[1,2,3],[3,4,5],[4,5,6]])
+    b = np.array([[1,2,3],[1,2,4],[3,4,5],[4,4,6],[4,5,6]])
+    d = DTW(a, b)
+    print "cost:", d[0]
+    print "alignment:"
+    print d[2][0]
+
+    np.random.seed(42)
+    a = np.random.random((170, 30))
+    b = np.random.random((130, 30))
+    t = time.time()
+    for k in xrange(5):
+        d = DTW(a, b, e_dist)
+    print "took:", ((time.time() - t) / k),  "seconds per run"
+    print "cost:", d[0]
+    np.testing.assert_almost_equal(d[0], 261.9954420007628)
+
+    np.random.seed(42)
+    a = np.random.random(900)
+    b = np.random.random(1000)
+    t = time.time()
+    for k in xrange(3):
+        d = DTW(a, b, e_dist)
+    print "took:", ((time.time() - t) / k),  "seconds per run"
+    print "cost:", d[0]
+    np.testing.assert_almost_equal(d[0], 126.59496270135652)
+
+    np.random.seed(42)
+    idx = np.linspace(0, 2*np.pi, 1000)
+    template = np.cos(idx)
+    query = np.r_[np.sin(idx) + np.random.random(1000)/2., np.array([0 for i in range(20)])]
+    t = time.time()
+    d = DTW(query, template, e_dist)
+    print "took:", (time.time() - t),  "seconds"
+    print "cost:", d[0]
+    np.testing.assert_almost_equal(d[0], 147.10538852640641)
 
     # R dtw align of f101_at/af : time: 0.101805925369, cost: 1586.29814585
     import htkmfc
