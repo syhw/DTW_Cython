@@ -23,27 +23,28 @@ DTYPE = np.float64
 ctypedef np.float64_t DTYPE_t
 
 
-cpdef e_dist(DTYPE_t[:] x, DTYPE_t[:] y):
-    """ Euclidian distance, equivalent to: d=x-y, return sqrt(dot(d,d)) """
-    # In [11]: %timeit dist(a,b) # numpy version as above
-    # 100000 loops, best of 3: 6.49 µs per loop
-    # In [12]: %timeit e_dist(a,b)
-    # 1000000 loops, best of 3: 1.78 µs per loop
+cpdef e2_dist(DTYPE_t[:] x, DTYPE_t[:] y):
+    """ Squared Euclidian distance, equivalent to: d=x-y, return dot(d,d) """
     cdef DTYPE_t d, tmp
     cdef np.intp_t K = x.shape[0]
     d = 0.0
     for k in range(K):
         tmp = x[k] - y[k]
         d += tmp * tmp
-    return sqrt(d)
+    return d
 
 
-cpdef e_dist_noslicing(DTYPE_t[:,:] X, DTYPE_t[:,:] Y, np.intp_t i, np.intp_t j):
+cpdef e_dist(DTYPE_t[:] x, DTYPE_t[:] y):
     """ Euclidian distance, equivalent to: d=x-y, return sqrt(dot(d,d)) """
     # In [11]: %timeit dist(a,b) # numpy version as above
     # 100000 loops, best of 3: 6.49 µs per loop
     # In [12]: %timeit e_dist(a,b)
     # 1000000 loops, best of 3: 1.78 µs per loop
+    return sqrt(e2_dist(x, y))
+
+
+cpdef e_dist_noslicing(DTYPE_t[:,:] X, DTYPE_t[:,:] Y, np.intp_t i, np.intp_t j):
+    """ Euclidian distance, equivalent to: d=X[i]-Y[j], return sqrt(dot(d,d)) """
     cdef DTYPE_t d, tmp
     cdef np.intp_t K = X.shape[1]
     d = 0.0
@@ -179,37 +180,37 @@ def test():
     b = np.random.random((130, 30))
     t = time.time()
     for k in xrange(5):
-        d = DTW(a, b, e_dist)
+        d = DTW(a, b, e2_dist)
     print "took:", ((time.time() - t) / k),  "seconds per run"
     print "cost:", d[0]
-    np.testing.assert_almost_equal(d[0], 261.9954420007628)
+    np.testing.assert_almost_equal(d[0], 533.4371725035011)
 
     np.random.seed(42)
     a = np.random.random(900)
     b = np.random.random(1000)
     t = time.time()
     for k in xrange(3):
-        d = DTW(a, b, e_dist)
+        d = DTW(a, b, e2_dist)
     print "took:", ((time.time() - t) / k),  "seconds per run"
     print "cost:", d[0]
-    np.testing.assert_almost_equal(d[0], 126.59496270135652)
+    np.testing.assert_almost_equal(d[0], 26.0858110759)
 
     np.random.seed(42)
     idx = np.linspace(0, 2*np.pi, 1000)
     template = np.cos(idx)
     query = np.r_[np.sin(idx) + np.random.random(1000)/2., np.array([0 for i in range(20)])]
     t = time.time()
-    d = DTW(query, template, e_dist)
+    d = DTW(query, template, e2_dist)
     print "took:", (time.time() - t),  "seconds"
     print "cost:", d[0]
-    np.testing.assert_almost_equal(d[0], 147.10538852640641)
+    np.testing.assert_almost_equal(d[0], 51.6351058322)
 
     # R dtw align of f101_at/af : time: 0.101805925369, cost: 1586.29814585
     import htkmfc
     mfc1 = np.asarray(htkmfc.open("s_f101_at.mfc").getall(), dtype=DTYPE)
     mfc2 = np.asarray(htkmfc.open("s_f101_ar.mfc").getall(), dtype=DTYPE)
     t = time.time()
-    d = DTW(mfc1, mfc2, e_dist)
+    d = DTW(mfc1, mfc2, e2_dist)
     print "took:", (time.time() - t),  "seconds"
     print "cost:", d[0]
     import pylab as pl
@@ -222,7 +223,7 @@ def test():
     mfc1 = np.asarray(htkmfc.open("s_f113_xof.mfc").getall(), dtype=DTYPE)
     mfc2 = np.asarray(htkmfc.open("s_f113_xok.mfc").getall(), dtype=DTYPE)
     t = time.time()
-    d = DTW(mfc1, mfc2, e_dist)
+    d = DTW(mfc1, mfc2, e2_dist)
     print "took:", (time.time() - t),  "seconds"
     print "cost:", d[0]
     pl.imshow(d[2][0].T, interpolation="nearest", origin="lower")
