@@ -6,8 +6,12 @@
 
 # TODO maybe use DTYPE_t[:,::1] (C contiguous) memoryview instd of DTYPE_t[:,:]
 # tried it -> no speed improvement
+# TODO 
+# see: http://jakevdp.github.io/blog/2012/08/08/memoryview-benchmarks/
+# tried it on e_dist -> no speed improvment???
 # TODO understand why cpdef is faster than cdef
 # TODO see if we can add some "nogil" (cpdef foo(int a, int b) nogil:...)
+# for instance would have to cpdef double e_dist(...) nogil:...
 
 import numpy as np
 cimport numpy as np
@@ -26,10 +30,25 @@ cpdef e_dist(DTYPE_t[:] x, DTYPE_t[:] y):
     # In [12]: %timeit e_dist(a,b)
     # 1000000 loops, best of 3: 1.78 µs per loop
     cdef DTYPE_t d, tmp
-    cdef int K = x.shape[0]
+    cdef np.intp_t K = x.shape[0]
     d = 0.0
     for k in range(K):
         tmp = x[k] - y[k]
+        d += tmp * tmp
+    return sqrt(d)
+
+
+cpdef e_dist_noslicing(DTYPE_t[:,:] X, DTYPE_t[:,:] Y, np.intp_t i, np.intp_t j):
+    """ Euclidian distance, equivalent to: d=x-y, return sqrt(dot(d,d)) """
+    # In [11]: %timeit dist(a,b) # numpy version as above
+    # 100000 loops, best of 3: 6.49 µs per loop
+    # In [12]: %timeit e_dist(a,b)
+    # 1000000 loops, best of 3: 1.78 µs per loop
+    cdef DTYPE_t d, tmp
+    cdef np.intp_t K = X.shape[1]
+    d = 0.0
+    for k in range(K):
+        tmp = X[i,k] - Y[j,k]
         d += tmp * tmp
     return sqrt(d)
 
@@ -41,7 +60,7 @@ cpdef m_dist(DTYPE_t[:] x, DTYPE_t[:] y):
     # In [12]: %timeit m_dist(a,b)
     # 1000000 loops, best of 3: 1.9 µs per loop
     cdef DTYPE_t d
-    cdef int K = x.shape[0]
+    cdef np.intp_t K = x.shape[0]
     d = 0.0
     for k in range(K):
         d += abs(x[k] - y[k])
@@ -83,9 +102,9 @@ cpdef DTW_cython(DTYPE_t[:,:] x, DTYPE_t[:,:] y, dist_function=None, dist_array=
      - a distance array as dist_array[x_ind][y_ind]
      - a distance function as dist_function
     """
-    cdef int N = x.shape[0]
-    cdef int M = y.shape[0]
-    cdef int i, j
+    cdef np.intp_t N = x.shape[0]
+    cdef np.intp_t M = y.shape[0]
+    cdef np.intp_t i, j
     cdef double[:,:] cost = np.empty((N, M), dtype=DTYPE)
 
     if dist_array != None:
@@ -112,41 +131,71 @@ cpdef DTW_cython(DTYPE_t[:,:] x, DTYPE_t[:,:] y, dist_function=None, dist_array=
                                                             cost[i,j-1])
     # here, cost[x.shape[0]-1,y.shape[0]-1] is the best possible distance
     # now, compute the path from x to y: path_x[x_ind] = y_ind; & y to x path_y
-    path = None
+    path = np.zeros((N, M), dtype=np.int)
+    path_x = []
+    path_y = []
+    path[N-1,M-1] = 1
+    i = N-1
+    j = M-1
+    cdef DTYPE_t c_i1_j
+    cdef DTYPE_t c_i1_j1
+    cdef DTYPE_t c_i_j1
+    while i > 0 or j > 0:
+        if i == 0:
+            j -= 1
+        elif j == 0:
+            i -= 1
+        else:
+            # where does cost[i,j] come from?
+            c_i1_j = cost[i-1,j]
+            c_i1_j1 = cost[i-1,j-1]
+            c_i_j1 = cost[i,j-1]
+            if c_i1_j1 <= c_i1_j and c_i1_j1 <= c_i_j1:
+                i -= 1
+                j -= 1
+            elif c_i1_j < c_i1_j1 and c_i1_j < c_i_j1:
+                i -= 1
+            else:
+                j -= 1
+        path[i,j] = 1
+        path_x.append(i)
+        path_y.append(j)
+    path_x.reverse()
+    path_y.reverse()
 
-    return cost[N-1,M-1], cost, path
+    return cost[N-1,M-1], cost, (path, path_x, path_y)
 
 
 def test():
-    np.random.seed(42)
-    a = np.random.random((170, 10))
-    b = np.random.random((130, 10))
-    t = time.time()
-    for k in xrange(10):
-        d = DTW(a, b, e_dist)
-    print d
-    print "took:", ((time.time() - t) / k),  "seconds per run"
-    np.testing.assert_almost_equal(d[0], 139.79425569811386)
-
-    np.random.seed(42)
-    a = np.random.random(900)
-    b = np.random.random(1000)
-    t = time.time()
-    for k in xrange(5):
-        d = DTW(a, b, e_dist)
-    print d
-    print "took:", ((time.time() - t) / k),  "seconds per run"
-    np.testing.assert_almost_equal(d[0], 126.59496270135652)
-
-    np.random.seed(42)
-    idx = np.linspace(0, 2*np.pi, 1000)
-    template = np.cos(idx)
-    query = np.r_[np.sin(idx) + np.random.random(1000)/2., np.array([0 for i in range(20)])]
-    t = time.time()
-    d = DTW(query, template, e_dist)
-    print d
-    print "took:", ((time.time() - t) / k),  "seconds"
-    np.testing.assert_almost_equal(d[0], 147.10538852640641)
+#    np.random.seed(42)
+#    a = np.random.random((170, 10))
+#    b = np.random.random((130, 10))
+#    t = time.time()
+#    for k in xrange(10):
+#        d = DTW(a, b, e_dist)
+#    print "took:", ((time.time() - t) / k),  "seconds per run"
+#    print "cost:", d[0]
+#    np.testing.assert_almost_equal(d[0], 139.79425569811386)
+#
+#    np.random.seed(42)
+#    a = np.random.random(900)
+#    b = np.random.random(1000)
+#    t = time.time()
+#    for k in xrange(3):
+#        d = DTW(a, b, e_dist)
+#    print "took:", ((time.time() - t) / k),  "seconds per run"
+#    print "cost:", d[0]
+#    np.testing.assert_almost_equal(d[0], 126.59496270135652)
+#
+#    np.random.seed(42)
+#    idx = np.linspace(0, 2*np.pi, 1000)
+#    template = np.cos(idx)
+#    query = np.r_[np.sin(idx) + np.random.random(1000)/2., np.array([0 for i in range(20)])]
+#    t = time.time()
+#    d = DTW(query, template, e_dist)
+#    print "took:", (time.time() - t),  "seconds"
+#    print "cost:", d[0]
+#    np.testing.assert_almost_equal(d[0], 147.10538852640641)
 
     # R dtw align of f101_at/af : time: 0.101805925369, cost: 1586.29814585
     import htkmfc
@@ -154,16 +203,21 @@ def test():
     mfc2 = np.asarray(htkmfc.open("s_f101_ar.mfc").getall(), dtype=DTYPE)
     t = time.time()
     d = DTW(mfc1, mfc2, e_dist)
-    print d
-    print "took:", ((time.time() - t) / k),  "seconds"
+    print "took:", (time.time() - t),  "seconds"
+    print "cost:", d[0]
 
     # R dtw align of f113_xof_xok : time: 0.0426249504089, cost: 1730.2299737
     mfc1 = np.asarray(htkmfc.open("s_f113_xof.mfc").getall(), dtype=DTYPE)
     mfc2 = np.asarray(htkmfc.open("s_f113_xok.mfc").getall(), dtype=DTYPE)
     t = time.time()
     d = DTW(mfc1, mfc2, e_dist)
-    print d
-    print "took:", ((time.time() - t) / k),  "seconds"
+    print "took:", (time.time() - t),  "seconds"
+    print "cost:", d[0]
+    import pylab as pl
+    pl.imshow(d[2][0].T, interpolation="nearest", origin="lower")
+    pl.savefig("path.png")
+    pl.imshow(np.asarray(d[1]).T, interpolation="nearest", origin="lower")
+    pl.savefig("cost.png")
 
 
 if __name__ == '__main__':

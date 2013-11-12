@@ -14,5 +14,7 @@ setup(
         ext_modules = [Extension("dtw", 
                                  ["dtw.pyx"],
                                  include_dirs=py_inc+np_inc,
-                                 extra_compile_args=["-O3"])]
+                                 extra_compile_args=["-O3"])],
+        include_dirs=[numpy.get_include(),
+                      os.path.join(numpy.get_include(), 'numpy')]
 )
