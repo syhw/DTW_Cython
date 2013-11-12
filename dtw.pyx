@@ -34,7 +34,6 @@ def euclidian_distance(DTYPE_t[:,:] x, DTYPE_t[:,:] y):
     cdef int N = x.shape[0]
     cdef int M = y.shape[0]
     cdef int K = y.shape[1]
-    #cdef double[:, ::1] D = np.empty((N,M), dtype=np.float64)
     cdef double[:,:] D = np.empty((N,M), dtype=np.float64)
     for i in range(N):
         for j in range(M):
@@ -46,7 +45,6 @@ def euclidian_distance(DTYPE_t[:,:] x, DTYPE_t[:,:] y):
     return np.asarray(D)
 
 
-#def manhattan_distance(np.ndarray[DTYPE_t, ndim=2] x, np.ndarray[DTYPE_t, ndim=2] y):
 def manhattan_distance(DTYPE_t[:,:] x, DTYPE_t[:,:] y):
     cdef DTYPE_t d, tmp
     cdef int N = x.shape[0]
