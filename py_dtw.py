@@ -64,7 +64,7 @@ def test():
     a = np.random.random((170, 10))
     b = np.random.random((130, 10))
     t = time.time()
-    for k in xrange(10):
+    for k in xrange(2):
         d = DTW(a, b, euclidian_distance)
     print d
     print "took:", ((time.time() - t) / k),  "seconds per run"
