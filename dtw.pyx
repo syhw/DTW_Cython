@@ -38,11 +38,6 @@ cdef DTW_1d(DTYPE_t[:] x, DTYPE_t[:] y):
     return cost[N-1][M-1]
 
 
-cdef CTYPE_t dummy_dist(DTYPE_t[:,:] x, DTYPE_t[:,:] y, IND_t i, IND_t j, IND_t K) nogil:
-    """ to replace "None" so that it's not a Python object in DTW(...) """
-    return 0.0
-
-
 cdef CTYPE_t e_dist(DTYPE_t[:,:] x, DTYPE_t[:,:] y, IND_t i, IND_t j, IND_t K) nogil:
     """ Euclidian distance, equivalent to: d=x-y, return sqrt(dot(d,d)) """
     return sqrt(e2_dist(x, y, i, j, K))
@@ -58,6 +53,12 @@ cdef CTYPE_t e2_dist(DTYPE_t[:,:] x, DTYPE_t[:,:] y, IND_t i, IND_t j, IND_t K) 
         tmp = x[i,k] - y[j,k]
         d += tmp * tmp
     return d
+
+
+def e2_dist_python(x, y):
+    """ Squared Euclidian distance, equivalent to: d=x[i]-y[j], return dot(d,d) """
+    d = x - y
+    return np.dot(d, d)
 
 
 #cdef DTYPE_t abs_cython(DTYPE_t x) nogil:
@@ -121,17 +122,19 @@ def DTW(x, y, return_alignment=0, cython_dist_function=None,
             sys.exit(-1)
         return DTW_f(xx, yy, dist_function=c_d_func, return_alignment=r_a)
     else:
-        d_array = np.empty((0,0), dtype=CTYPE) ###
         if dist_array != None:
-            assert dist_array.shape == (x.shape[0], y.shape[0]), "dist_array is not of X.Y shape"
+            d_array = np.empty((0,0), dtype=CTYPE) ###
+            assert dist_array.shape == (xx.shape[0], yy.shape[0]), "dist_array is not of X.Y shape"
             if dist_array.dtype != CTYPE:
                 d_array = np.asarray(dist_array, dtype=CTYPE)
             else:
                 d_array = dist_array
         else:
-            # TODO for/for apply python_dist_function
-            # TODO parallelize?
-            pass
+            # TODO parallelize these loops?
+            d_array = np.empty((xx.shape[0], yy.shape[0]), dtype=CTYPE) ###
+            for i in range(xx.shape[0]):
+                for j in range(yy.shape[0]):
+                    d_array[i,j] = python_dist_function(xx[i], yy[j])
         return DTW_a(xx, yy, dist_array=d_array, return_alignment=r_a)
 
 
@@ -238,7 +241,15 @@ def test():
     t = time.time()
     for k in xrange(10):
         d = DTW(a, b)
-    print "took:", ((time.time() - t) / k),  "seconds per run"
+    print "in cython, took:", ((time.time() - t) / k),  "seconds per run"
+    print "cost with squared euclidian:", d
+    np.testing.assert_almost_equal(d, 533.437172504)
+
+    t = time.time()
+    for k in xrange(10):
+        d = DTW(a, b, return_alignment=0, cython_dist_function=None,
+                dist_array=None, python_dist_function=e2_dist_python)
+    print "in python, took:", ((time.time() - t) / k),  "seconds per run"
     print "cost with squared euclidian:", d
     np.testing.assert_almost_equal(d, 533.437172504)
 
