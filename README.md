@@ -5,6 +5,11 @@ Easy to use Dynamic Time Warping in Cython. You can set your own distance in
 `my_dist.pyx` by respecting the function name and the type.
 
 
+Dependencies:
+ - Cython
+ - Numpy
+
+
 Usage:
 
     make
