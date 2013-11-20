@@ -6,9 +6,10 @@ Easy to use Dynamic Time Warping in Cython. You can set your own distance in
 
 
 Usage:
-        make
-        (optional) open dtw.html
-        python -c "import dtw; dtw.test()"
+
+    make
+    (optional) open dtw.html
+    python -c "import dtw; dtw.test()"
 
 
 See `DTW(...)` and `dtw.test()` for the usage of the DTW function.
