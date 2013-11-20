@@ -11,7 +11,11 @@ np_inc = [os.path.join(np_lib, 'core/include')]
 
 setup(
         cmdclass = {'build_ext': build_ext},
-        ext_modules = [Extension("dtw", 
+        ext_modules = [Extension("my_dist", 
+                                 ["my_dist.pyx"],
+                                 include_dirs=py_inc+np_inc,
+                                 extra_compile_args=["-O3"]),
+                       Extension("dtw", 
                                  ["dtw.pyx"],
                                  include_dirs=py_inc+np_inc,
                                  extra_compile_args=["-O3"])],

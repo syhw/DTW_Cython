@@ -1,4 +1,4 @@
-#cython: profile=True
+#cython: profile=False
 # set profile to True to see where we are spending time / what is Cythonized
 #cython: boundscheck=False
 # set boundscheck to True when debugging out of bounds errors
@@ -7,20 +7,12 @@
 # TODO maybe use DTYPE_t[:,::1] (C contiguous) memoryview instd of DTYPE_t[:,:]
 # tried it -> no speed improvement
 # TODO see if we can add some "nogil" (cpdef foo(int a, int b) nogil:...)
-# for instance would have to cpdef double e_dist(...) nogil:...
 
-import numpy as np
-cimport numpy as np
-cimport cython
+include "dtw_types.pxi"
 from libc.math cimport sqrt
-import time
+import time, sys
 
-DTYPE = np.float64 # features' type (could be int)
-CTYPE = np.float64 # cost's type (should be float)
-ctypedef np.float64_t DTYPE_t
-ctypedef np.float64_t CTYPE_t
-ctypedef np.intp_t IND_t 
-ctypedef CTYPE_t (*dist_func_t)(DTYPE_t[:,:], DTYPE_t[:,:], IND_t, IND_t, IND_t)
+from my_dist cimport dist
 
 
 cdef CTYPE_t e2_dist_1d(DTYPE_t x, DTYPE_t y):
@@ -46,17 +38,17 @@ cdef DTW_1d(DTYPE_t[:] x, DTYPE_t[:] y):
     return cost[N-1][M-1]
 
 
-cdef CTYPE_t dummy_dist(DTYPE_t[:,:] x, DTYPE_t[:,:] y, IND_t i, IND_t j, IND_t K):
+cdef CTYPE_t dummy_dist(DTYPE_t[:,:] x, DTYPE_t[:,:] y, IND_t i, IND_t j, IND_t K) nogil:
     """ to replace "None" so that it's not a Python object in DTW(...) """
     return 0.0
 
 
-cdef CTYPE_t e_dist(DTYPE_t[:,:] x, DTYPE_t[:,:] y, IND_t i, IND_t j, IND_t K):
+cdef CTYPE_t e_dist(DTYPE_t[:,:] x, DTYPE_t[:,:] y, IND_t i, IND_t j, IND_t K) nogil:
     """ Euclidian distance, equivalent to: d=x-y, return sqrt(dot(d,d)) """
     return sqrt(e2_dist(x, y, i, j, K))
 
 
-cdef CTYPE_t e2_dist(DTYPE_t[:,:] x, DTYPE_t[:,:] y, IND_t i, IND_t j, IND_t K):# nogil:
+cdef CTYPE_t e2_dist(DTYPE_t[:,:] x, DTYPE_t[:,:] y, IND_t i, IND_t j, IND_t K) nogil:
     """ Squared Euclidian distance, equivalent to: d=x[i]-y[j], return dot(d,d) """
     # In this function, we avoid memoryview slicing for speed,
     # see: http://jakevdp.github.io/blog/2012/08/08/memoryview-benchmarks/
@@ -68,21 +60,34 @@ cdef CTYPE_t e2_dist(DTYPE_t[:,:] x, DTYPE_t[:,:] y, IND_t i, IND_t j, IND_t K):
     return d
 
 
-cdef CTYPE_t m_dist(DTYPE_t[:,:] x, DTYPE_t[:,:] y, IND_t i, IND_t j, IND_t K):
+#cdef DTYPE_t abs_cython(DTYPE_t x) nogil:
+#    if x > 0:
+#        return x
+#    return -x
+
+
+cdef CTYPE_t m_dist(DTYPE_t[:,:] x, DTYPE_t[:,:] y, IND_t i, IND_t j, IND_t K): #nogil:
     """ Manhattan distance, equivalent to: d=x-y, return sum(abs(d)) """
     cdef CTYPE_t d = 0.0
     for k in range(K):
-        d += abs(x[i,k] - y[j,k])
+        #d += abs_cython(x[i,k] - y[j,k])
+        d += abs(x[i,k] - y[j,k]) # should be compiled/linked to C as said in:
+        # http://docs.cython.org/src/userguide/language_basics.html
+        # but removes the nogil
     return d
 
 
-cdef DTW(x, y, return_alignment=0, dist_func_t cython_dist_function=dummy_dist,
+def DTW(x, y, return_alignment=0, cython_dist_function=None,
         dist_array=None, python_dist_function=None):
     """ Python wrapper does the array format checks + asserts + distance string
      - x and y should be numpy 2dim ndarrays of DTYPE.
      - return_alignment = 0/1 (False/True) if you want the DTW alignment.
      In order of priority:
-         - cython_dist_function should be a Cython function as e2_dist,
+         - cython_dist_function should be a string and will call a Cython fct:
+           - "squared_euclidian" (uses e2_dist)
+           - "euclidian" (uses e_dist)
+           - "manhattan" (uses m_dist)
+           - "my_dist" (uses my_dist.dist)
          - dist_array should be a x.shape[0], y.shape[0] 2dim ndarray of CTYPE,
          - python_dist_function should be a Python function as e2_dist_python.
      The default distance used is e2_dist.
@@ -102,10 +107,18 @@ cdef DTW(x, y, return_alignment=0, dist_func_t cython_dist_function=dummy_dist,
     cdef int r_a = return_alignment
     cdef dist_func_t c_d_func = e2_dist
     ###cdef CTYPE_t[:,:] d_array = np.empty((0,0), dtype=CTYPE)
-    if cython_dist_function == dummy_dist and dist_array == None and python_dist_function == None:
+    if (cython_dist_function == None and dist_array == None and python_dist_function == None) or cython_dist_function == "squared_euclidian":
         return DTW_f(xx, yy, dist_function=c_d_func, return_alignment=r_a)
-    elif cython_dist_function != dummy_dist:
-        c_d_func = cython_dist_function
+    elif cython_dist_function != None:
+        if cython_dist_function == "euclidian":
+            c_d_func = e_dist
+        elif cython_dist_function == "manhattan":
+            c_d_func = m_dist
+        elif cython_dist_function == "my_dist":
+            c_d_func = dist
+        else:
+            print >> sys.stderr, "ERROR in cython_dist_function string"
+            sys.exit(-1)
         return DTW_f(xx, yy, dist_function=c_d_func, return_alignment=r_a)
     else:
         d_array = np.empty((0,0), dtype=CTYPE) ###
@@ -226,8 +239,16 @@ def test():
     for k in xrange(10):
         d = DTW(a, b)
     print "took:", ((time.time() - t) / k),  "seconds per run"
-    print "cost:", d
+    print "cost with squared euclidian:", d
     np.testing.assert_almost_equal(d, 533.437172504)
+
+    d = DTW(a, b, return_alignment=0, cython_dist_function="manhattan")
+    print "cost with manhattan:", d
+    np.testing.assert_almost_equal(d, 1165.4570397)
+
+    d = DTW(a, b, return_alignment=0, cython_dist_function="my_dist")
+    print "cost with my dist:", d
+    np.testing.assert_almost_equal(d, 764.989207817)
 
     np.random.seed(42)
     a = np.random.random(900)
