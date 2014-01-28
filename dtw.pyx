@@ -184,8 +184,11 @@ cdef DTW_a(DTYPE_t[:,:] x, DTYPE_t[:,:] y, CTYPE_t[:,:] dist_array,
     cdef IND_t i, j
     cdef CTYPE_t[:,:] cost = np.empty((N, M), dtype=CTYPE)
     # initialization
-    cost[:,0] = dist_array[:,0]
-    cost[0,:] = dist_array[0,:]
+    cost[0,0] = dist_array[0,0]
+    for i in range(1, N):
+        cost[i,0] = dist_array[i,0] + cost[i-1,0]
+    for j in range(1, M):
+        cost[0,j] = dist_array[0,j] + cost[0,j-1]
     # the dynamic programming loop
     for i in range(1, N):
         for j in range(1, M):
@@ -207,10 +210,11 @@ cdef DTW_f(DTYPE_t[:,:] x, DTYPE_t[:,:] y, dist_func_t dist_function,
     cdef IND_t i, j
     cdef CTYPE_t[:,:] cost = np.empty((N, M), dtype=CTYPE)
     # initialization
-    for i in range(N):
-        cost[i,0] = dist_function(x, y, i, 0, K)
-    for j in range(M):
-        cost[0,j] = dist_function(x, y, 0, j, K)
+    cost[0,0] = dist_function(x, y, 0, 0, K)
+    for i in range(1, N):
+        cost[i,0] = dist_function(x, y, i, 0, K) + cost[i-1,0]
+    for j in range(1, M):
+        cost[0,j] = dist_function(x, y, 0, j, K) + cost[0,j-1]
     # the dynamic programming loop
     for i in range(1, N):
         for j in range(1, M):
@@ -243,7 +247,7 @@ def test():
         d = DTW(a, b)
     print "in cython, took:", ((time.time() - t) / k),  "seconds per run"
     print "cost with squared euclidian:", d
-    np.testing.assert_almost_equal(d, 533.437172504)
+    np.testing.assert_almost_equal(d, 735.216913058)
 
     t = time.time()
     for k in xrange(10):
@@ -251,15 +255,15 @@ def test():
                 dist_array=None, python_dist_function=e2_dist_python)
     print "in python, took:", ((time.time() - t) / k),  "seconds per run"
     print "cost with squared euclidian:", d
-    np.testing.assert_almost_equal(d, 533.437172504)
+    np.testing.assert_almost_equal(d, 735.2169130582149)
 
     d = DTW(a, b, return_alignment=0, cython_dist_function="manhattan")
     print "cost with manhattan:", d
-    np.testing.assert_almost_equal(d, 1165.4570397)
+    np.testing.assert_almost_equal(d, 1564.0138162604164)
 
     d = DTW(a, b, return_alignment=0, cython_dist_function="my_dist")
     print "cost with my dist:", d
-    np.testing.assert_almost_equal(d, 764.989207817)
+    np.testing.assert_almost_equal(d, 1038.6589071709757)
 
     np.random.seed(42)
     a = np.random.random(900)
@@ -270,13 +274,13 @@ def test():
         d = DTW(a, b)
     print "took:", ((time.time() - t) / k),  "seconds per run"
     print "cost:", d
-    np.testing.assert_almost_equal(d, 26.0858110759)
+    np.testing.assert_almost_equal(d, 30.243067206626687)
     print "same as above in 1D:"
     for k in xrange(10):
         d = DTW_1d(a, b)
     print "took:", ((time.time() - t) / k),  "seconds per run"
     print "cost:", d
-    np.testing.assert_almost_equal(d, 26.0858110759)
+    np.testing.assert_almost_equal(d, 30.243067206626687)
 
     np.random.seed(42)
     idx = np.linspace(0, 2*np.pi, 1000)
@@ -287,7 +291,7 @@ def test():
     d = DTW(query, template)
     print "took:", (time.time() - t),  "seconds"
     print "cost:", d
-    np.testing.assert_almost_equal(d, 51.6351058322)
+    np.testing.assert_almost_equal(d, 93.24055246009024)
 
     # R dtw align of f101_at/af : time: 0.101805925369, cost: 1586.29814585
     import htkmfc
@@ -299,7 +303,7 @@ def test():
     d = DTW(mfc1, mfc2, return_alignment=1)
     print "took:", (time.time() - t),  "seconds"
     print "cost:", d[0]
-    np.testing.assert_almost_equal(d[0], 21856.8021244)
+    np.testing.assert_almost_equal(d[0], 22694.921605657357)
     import pylab as pl
     pl.imshow(d[2][0], interpolation="nearest", origin="lower")
     pl.savefig("path.png")
@@ -314,7 +318,7 @@ def test():
     d = DTW(mfc1, mfc2, return_alignment=1)
     print "took:", (time.time() - t),  "seconds"
     print "cost:", d[0]
-    np.testing.assert_almost_equal(d[0], 26551.3192278)
+    np.testing.assert_almost_equal(d[0], 27641.68437497731)
     pl.imshow(d[2][0], interpolation="nearest", origin="lower")
     pl.savefig("path2.png")
     pl.imshow(np.asarray(d[1]), interpolation="nearest", origin="lower")
