@@ -8,11 +8,13 @@
 # tried it -> no speed improvement
 # TODO see if we can add some "nogil" (cpdef foo(int a, int b) nogil:...)
 
-include "dtw_types.pxi"
+include "_dtw_types.pxi"
 from libc.math cimport sqrt
 import time, sys
 
-from my_dist cimport dist
+import pyximport
+pyximport.install()
+from _example_dist cimport dist
 
 
 cdef CTYPE_t e2_dist_1d(DTYPE_t x, DTYPE_t y):
