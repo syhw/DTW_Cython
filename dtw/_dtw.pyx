@@ -80,21 +80,34 @@ cdef CTYPE_t m_dist(DTYPE_t[:,:] x, DTYPE_t[:,:] y, IND_t i, IND_t j, IND_t K): 
     return d
 
 
+@cython.embedsignature(True)
 def DTW(x, y, return_alignment=0, cython_dist_function=None,
         dist_array=None, python_dist_function=None):
-    """ Python wrapper does the array format checks + asserts + distance string
-     - x and y should be numpy 2dim ndarrays of DTYPE.
-     - return_alignment = 0/1 (False/True) if you want the DTW alignment.
-     In order of priority:
-         - cython_dist_function should be a string and will call a Cython fct:
-           - "squared_euclidian" (uses e2_dist)
-           - "euclidian" (uses e_dist)
-           - "manhattan" (uses m_dist)
-           - "my_dist" (uses my_dist.dist)
-         - dist_array should be a x.shape[0], y.shape[0] 2dim ndarray of CTYPE,
-         - python_dist_function should be a Python function as e2_dist_python.
-     The default distance used is e2_dist.
-    --> a bit of overhead, maybe you want to call DTW_cython_(f|a) directly """
+    """ Dynamic time warping of the first two arguments (x and y).
+
+    :param x: 2-dimensional ndarray of DTYPE
+    :param y: 2-dimensional ndarray of DTYPE
+    :param return_alignment: 0/1 (False/True) if you want the DTW alignment.
+                             default to 0
+    :param cython_dist_function: string, will call a Cython function:
+                                 - "squared_euclidian" (uses e2_dist)
+                                 - "euclidian" (uses e_dist)
+                                 - "manhattan" (uses m_dist)
+                                 - "my_dist" (uses my_dist.dist)
+    :param dist_array: should be a x.shape[0], y.shape[0] 2dim ndarray of
+                       CTYPE, lower priority than cython_dist_function (if
+                       both are given, cython_dist_function will be used).
+    :returns either:
+          - (return_alignment=0) best possible cost of the alignment
+          - (return_alignment=1) a tuple (best possible cost of the alignment,
+             full (dynamic prog.) cost array, x-y best alignment.
+
+    The default distance used is e2_dist ("squared_euclidian").
+    
+    This python wrapper of the cython code does the array format checks +
+    asserts + distance string. This induces a bit of overhead, maybe (if you
+    know what you do), you want to call "DTW_cython_(f|a)" directly.
+    """
 
     xx = x
     if len(x.shape) == 1:
@@ -252,6 +265,7 @@ def test():
     np.testing.assert_almost_equal(d, 735.216913058)
 
     t = time.time()
+    passed = 0
     for k in xrange(10):
         d = DTW(a, b, return_alignment=0, cython_dist_function=None,
                 dist_array=None, python_dist_function=e2_dist_python)
@@ -295,36 +309,43 @@ def test():
     print "cost:", d
     np.testing.assert_almost_equal(d, 93.24055246009024)
 
-    # R dtw align of f101_at/af : time: 0.101805925369, cost: 1586.29814585
-    import htkmfc
-    mfc1 = np.asarray(htkmfc.open("s_f101_at.mfc").getall(), dtype=DTYPE)
-    mfc2 = np.asarray(htkmfc.open("s_f101_ar.mfc").getall(), dtype=DTYPE)
-    print "MFCC now:"
-    print mfc1.shape, "x", mfc2.shape
-    t = time.time()
-    d = DTW(mfc1, mfc2, return_alignment=1)
-    print "took:", (time.time() - t),  "seconds"
-    print "cost:", d[0]
-    np.testing.assert_almost_equal(d[0], 22694.921605657357)
-    import pylab as pl
-    pl.imshow(d[2][0], interpolation="nearest", origin="lower")
-    pl.savefig("path.png")
-    pl.imshow(np.asarray(d[1]), interpolation="nearest", origin="lower")
-    pl.savefig("cost.png")
+    has_htkmfc_pylab = False
+    try:
+        import htkmfc
+        import pylab as pl
+        has_htkmfc_pylab = True
+    except ImportError:
+        print >> sys.stderr, "You need htkmfc (single file) and matplotlib"
+        # TODO distribute numpy arrays of MFCCs
+    if has_htkmfc_pylab:
+        # R dtw align of f101_at/af : time: 0.101805925369, cost: 1586.29814585
+        mfc1 = np.asarray(htkmfc.open("s_f101_at.mfc").getall(), dtype=DTYPE)
+        mfc2 = np.asarray(htkmfc.open("s_f101_ar.mfc").getall(), dtype=DTYPE)
+        print "MFCC now:"
+        print mfc1.shape, "x", mfc2.shape
+        t = time.time()
+        d = DTW(mfc1, mfc2, return_alignment=1)
+        print "took:", (time.time() - t),  "seconds"
+        print "cost:", d[0]
+        np.testing.assert_almost_equal(d[0], 22694.921605657357)
+        pl.imshow(d[2][0], interpolation="nearest", origin="lower")
+        pl.savefig("path.png")
+        pl.imshow(np.asarray(d[1]), interpolation="nearest", origin="lower")
+        pl.savefig("cost.png")
 
-    # R dtw align of f113_xof_xok : time: 0.0426249504089, cost: 1730.2299737
-    mfc1 = np.asarray(htkmfc.open("s_f113_xof.mfc").getall(), dtype=DTYPE)
-    mfc2 = np.asarray(htkmfc.open("s_f113_xok.mfc").getall(), dtype=DTYPE)
-    print mfc1.shape, "x", mfc2.shape
-    t = time.time()
-    d = DTW(mfc1, mfc2, return_alignment=1)
-    print "took:", (time.time() - t),  "seconds"
-    print "cost:", d[0]
-    np.testing.assert_almost_equal(d[0], 27641.68437497731)
-    pl.imshow(d[2][0], interpolation="nearest", origin="lower")
-    pl.savefig("path2.png")
-    pl.imshow(np.asarray(d[1]), interpolation="nearest", origin="lower")
-    pl.savefig("cost2.png")
+        # R dtw align of f113_xof_xok : time: 0.0426249504089, cost: 1730.2299737
+        mfc1 = np.asarray(htkmfc.open("s_f113_xof.mfc").getall(), dtype=DTYPE)
+        mfc2 = np.asarray(htkmfc.open("s_f113_xok.mfc").getall(), dtype=DTYPE)
+        print mfc1.shape, "x", mfc2.shape
+        t = time.time()
+        d = DTW(mfc1, mfc2, return_alignment=1)
+        print "took:", (time.time() - t),  "seconds"
+        print "cost:", d[0]
+        np.testing.assert_almost_equal(d[0], 27641.68437497731)
+        pl.imshow(d[2][0], interpolation="nearest", origin="lower")
+        pl.savefig("path2.png")
+        pl.imshow(np.asarray(d[1]), interpolation="nearest", origin="lower")
+        pl.savefig("cost2.png")
 
 
 if __name__ == '__main__':

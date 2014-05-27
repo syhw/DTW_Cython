@@ -13,7 +13,7 @@ Dependencies:
 Usage:
 
     make
-    (optional) open dtw.html
+    (optional) open dtw/_dtw.html
     python -c "import dtw; dtw.test()"
 
 
