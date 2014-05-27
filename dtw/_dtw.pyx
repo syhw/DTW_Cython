@@ -12,8 +12,6 @@ include "_dtw_types.pxi"
 from libc.math cimport sqrt
 import time, sys
 
-import pyximport
-pyximport.install()
 from _example_dist cimport dist
 
 
