@@ -4,6 +4,7 @@ DTW in Cython
 Easy to use Dynamic Time Warping in Cython. You can set your own distance in
 `_example_dist.pyx` by respecting the function name and the type.
 
+[![DOI](https://zenodo.org/badge/doi/10.5281/zenodo.45257.svg)](http://dx.doi.org/10.5281/zenodo.45257)
 
 Dependencies:
  - Cython
